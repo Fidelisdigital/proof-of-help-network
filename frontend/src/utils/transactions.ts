@@ -246,6 +246,11 @@ export async function txRewardReputation(fromAddress: string, toAddress: string,
     return sendTx('reward_reputation', 'type.googleapis.com/types.MessageRewardReputation', msgBytes, publicKey, privateKey);
 }
 
+export async function txPenaltyReputation(fromAddress: string, toAddress: string, points: number, reason: string, publicKey: string, privateKey: string): Promise<string> {
+    const msgBytes = encodePenaltyReputation(fromAddress, toAddress, points, reason);
+    return sendTx('penalty_reputation', 'type.googleapis.com/types.MessagePenaltyReputation', msgBytes, publicKey, privateKey);
+}
+
 export async function txFollowUser(followerAddress: string, targetAddress: string, publicKey: string, privateKey: string): Promise<string> {
     const msgBytes = encodeFollowUser(followerAddress, targetAddress);
     return sendTx('follow_user', 'type.googleapis.com/types.MessageFollowUser', msgBytes, publicKey, privateKey);

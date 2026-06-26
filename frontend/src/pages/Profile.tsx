@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { getTxsBySender } from '../utils/rpc';
 import { updateLocalCRED } from '../utils/state';
-import { txFollowUser, txEndorseMember } from '../utils/transactions';
+import { txFollowUser, txEndorseMember, txUpdateProfile } from '../utils/transactions';
 import { waitForTx } from '../utils/rpc';
 
 export default function Profile() {
@@ -98,7 +98,7 @@ export default function Profile() {
         setLoading(false);
     };
 
-    const handleSaveProfile = () => {
+    const handleSaveProfile = async () => {
         const profiles = JSON.parse(localStorage.getItem('phn_profiles') || '{}');
         if (profiles[address!]) {
             profiles[address!].bio = editBio;
@@ -108,6 +108,11 @@ export default function Profile() {
         }
         setEditMode(false);
         setSuccess('Profile updated!');
+        // Fire update_profile tx onchain
+        try {
+            const tags = editTags.split(',').map((t: string) => t.trim()).filter(Boolean);
+            await txUpdateProfile(address!, editBio, tags, wallet.publicKey, wallet.privateKey);
+        } catch { /* non-blocking */ }
     };
 
     const getCredColor = (score: number) => {

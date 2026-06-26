@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
-import { txSubmitAnswer, txVerifyAnswer, txAcceptAnswer } from '../utils/transactions';
+import { txSubmitAnswer, txVerifyAnswer, txAcceptAnswer, txDisputeAnswer, txStakeReputation, txRewardReputation, txPenaltyReputation } from '../utils/transactions';
 import { updateLocalCRED } from '../utils/state';
 import { waitForTx } from '../utils/rpc';
 
@@ -46,6 +46,11 @@ export default function QuestionDetail() {
             setTxHash(hash);
             await waitForTx(wallet.address, hash, 60000);
             deductFee(1000);
+            // Fire stake_reputation as secondary tx (1000 PROOFH stake)
+            try {
+                const answerId = `a_${wallet.address.slice(0,8)}_${Date.now()}`;
+                await txStakeReputation(wallet.address, answerId, 1000, wallet.publicKey, wallet.privateKey);
+            } catch { /* non-blocking */ }
             setSuccess(`Answer submitted! TX: ${hash.slice(0, 16)}...`);
             setAnswerContent('');
             refreshData();
@@ -80,7 +85,11 @@ export default function QuestionDetail() {
             // Update CRED for answer author (only helpful/accurate give +5)
             const answer = allAnswers[idx];
             if (answer && (vote === 'helpful' || vote === 'accurate')) {
-                const newCred = updateLocalCRED(answer.authorAddress);
+                updateLocalCRED(answer.authorAddress);
+                // Fire reward_reputation as secondary tx
+                try {
+                    await txRewardReputation(wallet.address, answer.authorAddress, 5, vote, wallet.publicKey, wallet.privateKey);
+                } catch { /* non-blocking */ }
                 setSuccess(`Verified as ${vote}! +5 CRED awarded to ${profiles[answer.authorAddress]?.username || 'answerer'}. TX: ${hash.slice(0, 16)}...`);
             } else {
                 setSuccess(`Marked as ${vote}. TX: ${hash.slice(0, 16)}...`);
@@ -92,6 +101,31 @@ export default function QuestionDetail() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleDispute = async (answerId: string) => {
+        if (!wallet.isConnected) return;
+        setLoading(true);
+        try {
+            // Fire dispute_answer + penalty_reputation together
+            const hash = await txDisputeAnswer(wallet.address, answerId, 'disputed_by_community', wallet.publicKey, wallet.privateKey);
+            await waitForTx(wallet.address, hash, 60000);
+            deductFee(1000);
+            // Fire penalty_reputation as secondary tx
+            const answer = JSON.parse(localStorage.getItem('phn_answers') || '[]').find((a: any) => a.id === answerId);
+            if (answer) {
+                try {
+                    await txPenaltyReputation(wallet.address, answer.authorAddress, 5, 'disputed', wallet.publicKey, wallet.privateKey);
+                } catch { /* non-blocking */ }
+            }
+            // Update local state
+            const allAnswers = JSON.parse(localStorage.getItem('phn_answers') || '[]');
+            const idx = allAnswers.findIndex((a: any) => a.id === answerId);
+            if (idx !== -1) { allAnswers[idx].isDisputed = true; localStorage.setItem('phn_answers', JSON.stringify(allAnswers)); }
+            setSuccess('Disputed! TX: ' + hash.slice(0, 16) + '...');
+            refreshData();
+        } catch (err: any) { setError(err.message || 'Failed to dispute'); }
+        setLoading(false);
     };
 
     const handleAccept = async (answerId: string) => {
@@ -290,6 +324,9 @@ export default function QuestionDetail() {
                                                 </button>
                                                 <button onClick={() => handleVerify(answer.id, 'accurate')} disabled={loading} style={{ padding: '7px 16px', borderRadius: 8, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: '#818CF8', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                                     🎯 Accurate ({answer.accurateVotes || 0})
+                                                </button>
+                                                <button onClick={() => handleDispute(answer.id)} disabled={loading} style={{ padding: '7px 16px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                                    ⚠️ Dispute ({answer.isDisputed ? 1 : 0})
                                                 </button>
                 
                                             </>
