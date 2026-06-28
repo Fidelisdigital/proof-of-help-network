@@ -30,19 +30,44 @@ export default function Profile() {
     const [editMode, setEditMode] = useState(false);
     const [editBio, setEditBio] = useState('');
     const [editTags, setEditTags] = useState('');
+    const [chainStats, setChainStats] = useState({
+        txCount: 0,
+        joinBlock: 0,
+        joinDate: '',
+        isVerified: false,
+        txTypes: {} as Record<string, number>
+    });
+    const [chainCRED, setChainCRED] = useState<number | null>(null);
 
     const isOwn = wallet.address === address;
 
     useEffect(() => {
         if (!address) return;
         // Recalculate CRED from actual data
-        updateLocalCRED(address);
+        // Fetch CRED from chain only — never from localStorage
+        updateLocalCRED(address).then(score => {
+            setChainCRED(score);
+        }).catch(() => setChainCRED(0));
         const profiles = JSON.parse(localStorage.getItem('phn_profiles') || '{}');
         setProfile(profiles[address]);
         const allQ = JSON.parse(localStorage.getItem('phn_questions') || '[]');
         setQuestions(allQ.filter((q: any) => q.authorAddress === address));
         const allA = JSON.parse(localStorage.getItem('phn_answers') || '[]');
         setAnswers(allA.filter((a: any) => a.authorAddress === address));
+        // Fetch chain stats for identity
+        getTxsBySender(address, 100).then(allTxs => {
+            const txCount = allTxs.length;
+            const isVerified = txCount >= 5;
+            const profileTx = allTxs.find((tx: any) => tx.messageType === 'create_profile');
+            const joinBlock = profileTx?.height || 0;
+            const joinDate = joinBlock > 0 ? `Block #${joinBlock}` : 'Unknown';
+            const txTypes: Record<string, number> = {};
+            allTxs.forEach((tx: any) => {
+                txTypes[tx.messageType] = (txTypes[tx.messageType] || 0) + 1;
+            });
+            setChainStats({ txCount, joinBlock, joinDate, isVerified, txTypes });
+        }).catch(() => {});
+
         // Fetch sent txs + faucet received from validator
         const FAUCET_ADDR = 'c0d8caf3fc48cbcc685a6a0b3004eaf28a23663b';
         Promise.all([
@@ -136,7 +161,7 @@ export default function Profile() {
         </div>
     );
 
-    const credColor = getCredColor(profile.reputationScore || 0);
+    const credColor = getCredColor(chainCRED || 0);
 
     return (
         <div style={{ background: '#060612', minHeight: '100vh', fontFamily: 'Inter,sans-serif', color: '#F9FAFB' }}>
@@ -172,10 +197,31 @@ export default function Profile() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
                                 <h1 style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: 28, color: '#fff', margin: 0 }}>{profile.username}</h1>
                                 <div style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: `${credColor}15`, border: `1px solid ${credColor}40`, color: credColor }}>
-                                    {profile.reputationScore || 0} CRED
+                                    {chainCRED !== null ? chainCRED : '...'} CRED
                                 </div>
                             </div>
                             <div style={{ fontSize: 12, color: '#4B5563', marginBottom: 10, fontFamily: 'monospace' }}>{address}</div>
+                            {/* Onchain Identity Badges */}
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                                {chainStats.isVerified && (
+                                    <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981' }}>
+                                        ✅ Verified Onchain
+                                    </span>
+                                )}
+                                {chainStats.joinBlock > 0 && (
+                                    <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818CF8' }}>
+                                        🔗 Joined {chainStats.joinDate}
+                                    </span>
+                                )}
+                                {chainStats.txCount > 0 && (
+                                    <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#A78BFA' }}>
+                                        ⛓️ {chainStats.txCount} onchain txs
+                                    </span>
+                                )}
+                                <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, background: 'rgba(6,6,18,0.8)', border: '1px solid #1F2937', color: '#4B5563', fontFamily: 'monospace' }}>
+                                    DID: {address.slice(0, 8)}...{address.slice(-6)}
+                                </span>
+                            </div>
                             {profile.bio && <p style={{ fontSize: 14, color: '#9CA3AF', lineHeight: 1.7, marginBottom: 16, maxWidth: 500 }}>{profile.bio}</p>}
 
                             {/* Tags */}
@@ -225,7 +271,7 @@ export default function Profile() {
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 24 }}>
                     {[
-                        { label: 'CRED Score', value: profile.reputationScore || 0, color: credColor },
+                        { label: 'CRED Score', value: chainCRED !== null ? chainCRED : '...', color: credColor },
                         { label: 'Questions', value: questions.length, color: '#6366F1' },
                         { label: 'Answers', value: answers.length, color: '#8B5CF6' },
                         { label: 'Endorsements', value: profile.endorsements || 0, color: '#10B981' },
@@ -236,6 +282,34 @@ export default function Profile() {
                         </div>
                     ))}
                 </div>
+
+                {/* Onchain Identity Card */}
+                {chainStats.txCount > 0 && (
+                    <div style={{ background: 'rgba(10,10,25,0.8)', border: '1px solid #1A1A2E', borderRadius: 16, padding: 24, marginBottom: 24 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily: 'Syne,sans-serif', letterSpacing: 1, marginBottom: 16 }}>⛓️ ONCHAIN IDENTITY</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
+                            {[
+                                { label: 'Total Txs', value: chainStats.txCount, color: '#6366F1' },
+                                { label: 'Joined', value: chainStats.joinDate, color: '#10B981' },
+                                { label: 'Status', value: chainStats.isVerified ? '✅ Verified' : '⏳ Building', color: chainStats.isVerified ? '#10B981' : '#F59E0B' },
+                            ].map(({ label, value, color }) => (
+                                <div key={label} style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(6,6,18,0.8)', border: '1px solid #1F2937', textAlign: 'center' }}>
+                                    <div style={{ fontSize: 11, color: '#4B5563', marginBottom: 4 }}>{label}</div>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color, fontFamily: 'Syne,sans-serif' }}>{value}</div>
+                                </div>
+                            ))}
+                        </div>
+                        {/* Tx type breakdown */}
+                        <div style={{ fontSize: 11, color: '#4B5563', marginBottom: 8 }}>TRANSACTION HISTORY</div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {Object.entries(chainStats.txTypes).map(([type, count]) => (
+                                <span key={type} style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', color: '#818CF8' }}>
+                                    {type} ×{count}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* CRED Breakdown */}
                 <div style={{ background: 'rgba(10,10,25,0.8)', border: '1px solid #1A1A2E', borderRadius: 16, padding: 24, marginBottom: 24 }}>

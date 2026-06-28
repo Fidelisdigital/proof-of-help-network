@@ -1,6 +1,15 @@
 import { buildTxJson, hexToBytes, bytesToHex } from './signing';
 import { submitTx, getHeight } from './rpc';
 
+// Real SHA256 hash of content for onchain verification
+async function sha256Hash(content: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // ── PROTOBUF MANUAL ENCODING ─────────────────────────────────────────────
 
 function encodeVarint(value: number): Uint8Array {
@@ -200,9 +209,9 @@ export async function txUpdateProfile(address: string, bio: string, tags: string
 }
 
 export async function txCreateQuestion(authorAddress: string, title: string, content: string, category: string, tags: string[], publicKey: string, privateKey: string, tribeId = ''): Promise<string> {
-    const contentHash = `hash_${Date.now()}_${authorAddress.slice(0, 8)}`;
+    const contentHash = await sha256Hash(title + content + authorAddress);
     const msgBytes = encodeCreateQuestion(authorAddress, title, contentHash, category, tags);
-    // Store content locally
+    // Store content locally with real hash
     const questions = JSON.parse(localStorage.getItem('phn_questions') || '[]');
     const questionId = `q_${authorAddress.slice(0, 8)}_${Date.now()}`;
     questions.push({ id: questionId, authorAddress, title, content, contentHash, category, tags, tribeId, answerCount: 0, acceptedAnswerId: '', createdAt: Date.now() });
@@ -211,9 +220,9 @@ export async function txCreateQuestion(authorAddress: string, title: string, con
 }
 
 export async function txSubmitAnswer(authorAddress: string, questionId: string, content: string, stakeAmount: number, publicKey: string, privateKey: string): Promise<string> {
-    const contentHash = `hash_ans_${Date.now()}_${authorAddress.slice(0, 8)}`;
+    const contentHash = await sha256Hash(content + authorAddress + questionId);
     const msgBytes = encodeSubmitAnswer(authorAddress, questionId, contentHash, stakeAmount);
-    // Store answer locally
+    // Store answer locally with real hash
     const answers = JSON.parse(localStorage.getItem('phn_answers') || '[]');
     const answerId = `a_${authorAddress.slice(0, 8)}_${Date.now()}`;
     answers.push({ id: answerId, questionId, authorAddress, content, contentHash, stakeAmount, helpfulVotes: 0, accurateVotes: 0, misleadingVotes: 0, isAccepted: false, isDisputed: false, createdAt: Date.now() });

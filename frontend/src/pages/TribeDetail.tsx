@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { txJoinTribe } from '../utils/transactions';
+import { getTribeMembersFromChain, hasJoinedTribeFromChain } from '../utils/state';
 import { waitForTx } from '../utils/rpc';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -24,7 +25,12 @@ export default function TribeDetail() {
     const [questions, setQuestions] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState('');
+    const [error, setError] = useState('');
     const [isJoined, setIsJoined] = useState(false);
+    const [pinnedQuestion, setPinnedQuestion] = useState<any>(null);
+    const [pinVotes, setPinVotes] = useState<Record<string, string[]>>({});
+    const [showPinModal, setShowPinModal] = useState(false);
+    const [selectedPinQ, setSelectedPinQ] = useState('');
 
     useEffect(() => {
         const tribes = JSON.parse(localStorage.getItem('phn_tribes') || '[]');
@@ -32,30 +38,43 @@ export default function TribeDetail() {
         setTribe(t);
         if (!t) return;
 
-        // Get joined status
-        const joined = JSON.parse(localStorage.getItem('phn_joined_tribes') || '{}');
-        const myJoined = joined[wallet.address] || [];
-        setIsJoined(myJoined.includes(id) || t.creatorAddress === wallet.address);
-
-        // Get all profiles to find members
+        // Get joined status from chain
         const profiles = JSON.parse(localStorage.getItem('phn_profiles') || '{}');
-        const allJoined = joined;
-        const memberAddresses: string[] = [];
-        // Creator is always a member
-        if (t.creatorAddress) memberAddresses.push(t.creatorAddress);
-        // Find all users who joined this tribe
-        Object.entries(allJoined).forEach(([addr, tribeIds]: any) => {
-            if (tribeIds.includes(id) && !memberAddresses.includes(addr)) {
-                memberAddresses.push(addr);
-            }
+        hasJoinedTribeFromChain(wallet.address, id!).then(joined => {
+            setIsJoined(joined || t.creatorAddress === wallet.address);
+        }).catch(() => {
+            // Fallback to localStorage
+            const localJoined = JSON.parse(localStorage.getItem('phn_joined_tribes') || '{}');
+            setIsJoined((localJoined[wallet.address] || []).includes(id) || t.creatorAddress === wallet.address);
         });
-        // Build member list with profiles
-        const memberList = memberAddresses.map(addr => ({
-            address: addr,
-            ...profiles[addr],
-            isCreator: addr === t.creatorAddress
-        })).sort((a, b) => (b.reputationScore || 0) - (a.reputationScore || 0));
-        setMembers(memberList);
+
+        // Get tribe members from chain
+        getTribeMembersFromChain(id!).then(memberAddresses => {
+            // Deduplicate
+            const unique = [...new Set([t.creatorAddress, ...memberAddresses].filter(Boolean))];
+            memberAddresses = unique;
+            const memberList = memberAddresses.map(addr => ({
+                address: addr,
+                ...profiles[addr],
+                isCreator: addr === t.creatorAddress
+            })).sort((a, b) => (b.reputationScore || 0) - (a.reputationScore || 0));
+            setMembers(memberList);
+        }).catch(() => {
+            // Fallback to localStorage
+            const localJoined = JSON.parse(localStorage.getItem('phn_joined_tribes') || '{}');
+            const memberAddresses: string[] = t.creatorAddress ? [t.creatorAddress] : [];
+            Object.entries(localJoined).forEach(([addr, tribeIds]: any) => {
+                if (tribeIds.includes(id) && !memberAddresses.includes(addr)) {
+                    memberAddresses.push(addr);
+                }
+            });
+            const memberList = memberAddresses.map(addr => ({
+                address: addr,
+                ...profiles[addr],
+                isCreator: addr === t.creatorAddress
+            })).sort((a: any, b: any) => (b.reputationScore || 0) - (a.reputationScore || 0));
+            setMembers(memberList);
+        });
 
         // Get questions for this tribe category
         const allQ = JSON.parse(localStorage.getItem('phn_questions') || '[]');
@@ -64,10 +83,25 @@ export default function TribeDetail() {
             q.tribeId === id
         );
         setQuestions(tribeQ);
+
+        // Load pinned question + votes
+        const pinData = JSON.parse(localStorage.getItem('phn_pin_votes') || '{}');
+        const tribePin = pinData[id!] || {};
+        setPinVotes(tribePin);
+        if (t.pinnedQuestionId) {
+            const pinned = allQ.find((q: any) => q.id === t.pinnedQuestionId);
+            setPinnedQuestion(pinned || null);
+        }
     }, [id, wallet.address]);
 
     const handleJoin = async () => {
         if (!wallet.isConnected) { nav('/signup'); return; }
+        // Tribe gating — require 500 PROOFH to join
+        if (wallet.balance < 500) {
+            setError('You need at least 500 PROOFH to join this tribe.');
+            return;
+        }
+        setError('');
         setLoading(true);
         try {
             const hash = await txJoinTribe(wallet.address, id!, wallet.publicKey, wallet.privateKey);
@@ -101,6 +135,39 @@ export default function TribeDetail() {
         if (diff < 60000) return 'just now';
         if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
         return `${Math.floor(diff / 3600000)}h ago`;
+    };
+
+    const handleVotePin = (questionId: string) => {
+        if (!isJoined) { setError('Join the tribe to vote on pinned questions'); return; }
+        const pinData = JSON.parse(localStorage.getItem('phn_pin_votes') || '{}');
+        if (!pinData[id!]) pinData[id!] = {};
+        if (!pinData[id!][questionId]) pinData[id!][questionId] = [];
+        // Toggle vote
+        const voters: string[] = pinData[id!][questionId];
+        const myIdx = voters.indexOf(wallet.address);
+        if (myIdx === -1) {
+            voters.push(wallet.address);
+        } else {
+            voters.splice(myIdx, 1);
+        }
+        pinData[id!][questionId] = voters;
+        localStorage.setItem('phn_pin_votes', JSON.stringify(pinData));
+        setPinVotes({...pinData[id!]});
+        // If question gets 2+ votes, pin it
+        if (voters.length >= 2) {
+            const tribes = JSON.parse(localStorage.getItem('phn_tribes') || '[]');
+            const tIdx = tribes.findIndex((t: any) => t.id === id);
+            if (tIdx !== -1) {
+                tribes[tIdx].pinnedQuestionId = questionId;
+                localStorage.setItem('phn_tribes', JSON.stringify(tribes));
+                const allQ = JSON.parse(localStorage.getItem('phn_questions') || '[]');
+                const pinned = allQ.find((q: any) => q.id === questionId);
+                setPinnedQuestion(pinned || null);
+                setSuccess(`Question pinned! ${voters.length} members voted.`);
+            }
+        } else {
+            setSuccess(`Vote recorded! ${voters.length}/2 votes to pin.`);
+        }
     };
 
     if (!tribe) return (
@@ -151,9 +218,14 @@ export default function TribeDetail() {
                                         ✅ {tribe.creatorAddress === wallet.address ? 'Creator' : 'Member'}
                                     </span>
                                 ) : (
-                                    <button onClick={handleJoin} disabled={loading} style={{ padding: '8px 20px', borderRadius: 10, background: `linear-gradient(135deg, ${color}, ${color}88)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Syne,sans-serif' }}>
-                                        {loading ? '⏳ Joining...' : '+ Join Tribe'}
-                                    </button>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                                        <button onClick={handleJoin} disabled={loading || wallet.balance < 500} style={{ padding: '8px 20px', borderRadius: 10, background: wallet.balance >= 500 ? `linear-gradient(135deg, ${color}, ${color}88)` : 'rgba(107,114,128,0.3)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: wallet.balance >= 500 ? 'pointer' : 'not-allowed', fontFamily: 'Syne,sans-serif' }}>
+                                            {loading ? '⏳ Joining...' : '+ Join Tribe'}
+                                        </button>
+                                        <span style={{ fontSize: 11, color: wallet.balance >= 500 ? '#10B981' : '#EF4444' }}>
+                                            {wallet.balance >= 500 ? `✅ ${wallet.balance} PROOFH — eligible` : `❌ Need 500 PROOFH (have ${wallet.balance})`}
+                                        </span>
+                                    </div>
                                 )}
                             </div>
                             {success && <div style={{ marginTop: 12, fontSize: 12, color: '#10B981' }}>✅ {success}</div>}

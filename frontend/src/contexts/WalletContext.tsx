@@ -11,7 +11,7 @@ async function fetchChainProfile(address: string): Promise<any> {
         return await res.json();
     } catch { return null; }
 }
-import { updateLocalCRED } from '../utils/state';
+import { updateLocalCRED, getBalanceFromChain, syncFromKnownUsers, syncAllFromChain } from '../utils/state';
 
 interface WalletState {
     address: string;
@@ -58,16 +58,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const [blockHeight, setBlockHeight] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load wallet from localStorage on startup
+    // Load wallet from localStorage on startup + sync from chain
     useEffect(() => {
         const saved = localStorage.getItem('phn_wallet');
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
+                parsed.trustScore = 0; // always reset — chain sets the real value
                 setWalletState(parsed);
             } catch { /* ignore */ }
         }
         setIsLoading(false);
+        // Check if this is a fresh browser (no profiles in localStorage)
+        const hasProfiles = Object.keys(JSON.parse(localStorage.getItem('phn_profiles') || '{}')).length > 0;
+        if (hasProfiles) {
+            // Fast sync using known users
+            syncFromKnownUsers().catch(() => {});
+        } else {
+            // Full block scan for fresh browser
+            syncAllFromChain().catch(() => {});
+        }
     }, []);
 
     // Poll block height every 5 seconds
@@ -83,30 +93,33 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return () => clearInterval(interval);
     }, []);
 
-    // Fetch balance once on connect, then only update CRED every 3s
-    // Balance is managed locally via deductFee to show reductions
+    // Fetch chain-derived balance + CRED every 10s
     useEffect(() => {
         if (!wallet.isConnected || !wallet.address) return;
-        // Balance is managed locally — chain balance ignored for plugin txs
-        // Only use chain balance if localStorage shows 0 (brand new account)
-        const saved = localStorage.getItem('phn_wallet');
-        const savedBalance = saved ? JSON.parse(saved).balance : 0;
-        if (savedBalance === 0) {
-            getAccount(wallet.address).then(account => {
-                if (typeof account.amount === 'number' && account.amount > 0) {
-                    setWalletState(prev => {
-                        const updated = { ...prev, balance: account.amount };
-                        localStorage.setItem('phn_wallet', JSON.stringify(updated));
-                        return updated;
-                    });
-                }
-            }).catch(() => {});
-        }
-        // Poll only CRED every 3s
-        const interval = setInterval(() => {
-            const credScore = updateLocalCRED(wallet.address);
-            setWalletState(prev => ({ ...prev, trustScore: credScore }));
-        }, 3000);
+        const fetchChainState = async () => {
+            try {
+                // Get real balance from chain tx history
+                const chainBalance = await getBalanceFromChain(wallet.address, 50000);
+                // Get CRED from chain tx history
+                const credScore = await updateLocalCRED(wallet.address);
+                const credNumber = typeof credScore === 'number' ? credScore : 0;
+                setWalletState(prev => {
+                    const updated = {
+                        ...prev,
+                        balance: chainBalance,
+                        trustScore: credNumber
+                    };
+                    localStorage.setItem('phn_wallet', JSON.stringify(updated));
+                    // Save per-address balance
+                    const balances = JSON.parse(localStorage.getItem('phn_balances') || '{}');
+                    balances[wallet.address] = chainBalance;
+                    localStorage.setItem('phn_balances', JSON.stringify(balances));
+                    return updated;
+                });
+            } catch { /* ignore */ }
+        };
+        fetchChainState();
+        const interval = setInterval(fetchChainState, 10000);
         return () => clearInterval(interval);
     }, [wallet.isConnected, wallet.address]);
 
@@ -137,7 +150,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 const updated = {
                     ...prev,
                     balance: typeof account.amount === 'number' ? account.amount : prev.balance,
-                    trustScore: credScore
+                    trustScore: typeof credScore === 'number' ? credScore : 0
                 };
                 localStorage.setItem('phn_wallet', JSON.stringify(updated));
                 return updated;

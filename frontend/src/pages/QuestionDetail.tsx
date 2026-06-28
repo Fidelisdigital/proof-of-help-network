@@ -1,8 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
-import { txSubmitAnswer, txVerifyAnswer, txAcceptAnswer, txDisputeAnswer, txStakeReputation, txRewardReputation, txPenaltyReputation } from '../utils/transactions';
-import { updateLocalCRED } from '../utils/state';
+import { txSubmitAnswer, txVerifyAnswer, txAcceptAnswer, txDisputeAnswer, txStakeReputation, txRewardReputation, txPenaltyReputation, txSendPROOFH, txJoinTribe } from '../utils/transactions';
+import { updateLocalCRED, getVoteCountsFromChain } from '../utils/state';
+
+// Verify content matches onchain hash
+async function verifyContentHash(content: string, extra: string, onchainHash: string): Promise<boolean> {
+    if (!onchainHash || onchainHash.startsWith('hash_')) return false; // old format
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content + extra);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const computed = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return computed === onchainHash;
+}
 import { waitForTx } from '../utils/rpc';
 
 export default function QuestionDetail() {
@@ -18,6 +29,8 @@ export default function QuestionDetail() {
     const [error, setError] = useState('');
     const [txHash, setTxHash] = useState('');
     const [success, setSuccess] = useState('');
+    const [chainVotes, setChainVotes] = useState<Record<string, {helpful:number,accurate:number,disputed:number}>>({});
+    const [contentVerified, setContentVerified] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         const questions = JSON.parse(localStorage.getItem('phn_questions') || '[]');
@@ -26,12 +39,42 @@ export default function QuestionDetail() {
         const allAnswers = JSON.parse(localStorage.getItem('phn_answers') || '[]');
         setAnswers(allAnswers.filter((a: any) => a.questionId === id));
         setProfiles(JSON.parse(localStorage.getItem('phn_profiles') || '{}'));
+        // Fetch vote counts + verify content from chain
+        const initialAnswers = JSON.parse(localStorage.getItem('phn_answers') || '[]')
+            .filter((a: any) => a.questionId === id);
+        initialAnswers.forEach(async (answer: any) => {
+            try {
+                const votes = await getVoteCountsFromChain(answer.id);
+                setChainVotes(prev => ({ ...prev, [answer.id]: votes }));
+                // Verify content hash
+                const verified = await verifyContentHash(
+                    answer.content, answer.authorAddress + answer.questionId, answer.contentHash
+                );
+                setContentVerified(prev => ({ ...prev, [answer.id]: verified }));
+            } catch { /* fallback */ }
+        });
+        // Verify question content
+        const allQs = JSON.parse(localStorage.getItem('phn_questions') || '[]');
+        const qItem = allQs.find((qx: any) => qx.id === id);
+        if (qItem?.contentHash && !qItem.contentHash.startsWith('hash_')) {
+            verifyContentHash(qItem.title + qItem.content, qItem.authorAddress, qItem.contentHash)
+                .then(v => setContentVerified(prev => ({ ...prev, [id!]: v })))
+                .catch(() => {});
+        }
     }, [id]);
 
     const refreshData = () => {
         const allAnswers = JSON.parse(localStorage.getItem('phn_answers') || '[]');
-        setAnswers(allAnswers.filter((a: any) => a.questionId === id));
+        const filtered = allAnswers.filter((a: any) => a.questionId === id);
+        setAnswers(filtered);
         setProfiles(JSON.parse(localStorage.getItem('phn_profiles') || '{}'));
+        // Fetch vote counts from chain for each answer
+        filtered.forEach(async (answer: any) => {
+            try {
+                const votes = await getVoteCountsFromChain(answer.id);
+                setChainVotes(prev => ({ ...prev, [answer.id]: votes }));
+            } catch { /* fallback to localStorage */ }
+        });
     };
 
     const handleSubmitAnswer = async () => {
@@ -90,7 +133,11 @@ export default function QuestionDetail() {
                 try {
                     await txRewardReputation(wallet.address, answer.authorAddress, 5, vote, wallet.publicKey, wallet.privateKey);
                 } catch { /* non-blocking */ }
-                setSuccess(`Verified as ${vote}! +5 CRED awarded to ${profiles[answer.authorAddress]?.username || 'answerer'}. TX: ${hash.slice(0, 16)}...`);
+                // Send PROOFH tip to answerer — makes PROOFH a real social token
+                try {
+                    await txSendPROOFH(wallet.address, answer.authorAddress, 100, wallet.publicKey, wallet.privateKey);
+                } catch { /* non-blocking — voter may not have enough */ }
+                setSuccess(`Verified as ${vote}! +5 CRED + 100 PROOFH sent to ${profiles[answer.authorAddress]?.username || 'answerer'}. TX: ${hash.slice(0, 16)}...`);
             } else {
                 setSuccess(`Marked as ${vote}. TX: ${hash.slice(0, 16)}...`);
             }
@@ -291,8 +338,16 @@ export default function QuestionDetail() {
                                                 {answerAuthor?.username?.[0]?.toUpperCase() || '?'}
                                             </div>
                                             <div>
-                                                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{answerAuthor?.username || answer.authorAddress.slice(0, 8)}</div>
-                                                <div style={{ fontSize: 11, color: '#6B7280' }}>{answerAuthor?.reputationScore || 0} CRED · {timeAgo(answer.createdAt)}</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{answerAuthor?.username || answer.authorAddress.slice(0, 8)}</div>
+                                                    {contentVerified[answer.id] === true && (
+                                                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 999, background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.3)' }}>✓ verified</span>
+                                                    )}
+                                                    {contentVerified[answer.id] === false && answer.contentHash && !answer.contentHash.startsWith('hash_') && (
+                                                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 999, background: 'rgba(239,68,68,0.15)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.3)' }}>⚠️ tampered</span>
+                                                    )}
+                                                </div>
+                                                <div style={{ fontSize: 11, color: '#6B7280' }}>{answerAuthor?.reputationScore !== undefined ? answerAuthor.reputationScore : '...'} CRED · {timeAgo(answer.createdAt)}</div>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -320,10 +375,10 @@ export default function QuestionDetail() {
                                         {wallet.address !== answer.authorAddress && (
                                             <>
                                                 <button onClick={() => handleVerify(answer.id, 'helpful')} disabled={loading} style={{ padding: '7px 16px', borderRadius: 8, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#10B981', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                                                    👍 Helpful ({answer.helpfulVotes || 0})
+                                                    👍 Helpful ({chainVotes[answer.id]?.helpful ?? answer.helpfulVotes ?? 0})
                                                 </button>
                                                 <button onClick={() => handleVerify(answer.id, 'accurate')} disabled={loading} style={{ padding: '7px 16px', borderRadius: 8, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: '#818CF8', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                                                    🎯 Accurate ({answer.accurateVotes || 0})
+                                                    🎯 Accurate ({chainVotes[answer.id]?.accurate ?? answer.accurateVotes ?? 0})
                                                 </button>
                                                 <button onClick={() => handleDispute(answer.id)} disabled={loading} style={{ padding: '7px 16px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                                     ⚠️ Dispute ({answer.isDisputed ? 1 : 0})
@@ -373,8 +428,6 @@ export default function QuestionDetail() {
                                 <button onClick={async (e) => {
                                     e.stopPropagation();
                                     try {
-                                        const { txJoinTribe } = await import('../utils/transactions');
-                                        const { waitForTx } = await import('../utils/rpc');
                                         const hash = await txJoinTribe(wallet.address, question.tribeId, wallet.publicKey, wallet.privateKey);
                                         await waitForTx(wallet.address, hash, 60000);
                                         const j = JSON.parse(localStorage.getItem('phn_joined_tribes') || '{}');
