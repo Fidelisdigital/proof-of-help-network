@@ -216,23 +216,25 @@ export default function Feed() {
     }, [wallet.isConnected, isLoading]);
 
     useEffect(() => {
-        const q = JSON.parse(localStorage.getItem('phn_questions') || '[]');
-        const p = JSON.parse(localStorage.getItem('phn_profiles') || '{}');
-        // Recalculate CRED for all users
-        Object.keys(p).forEach(addr => updateLocalCRED(addr));
-        const updatedP = JSON.parse(localStorage.getItem('phn_profiles') || '{}');
-        setQuestions(q.reverse());
-        setProfiles(updatedP);
-
-        // Top users by CRED
-        const users = Object.values(updatedP) as any[];
-        setTopUsers(users.sort((a: any, b: any) => (b.reputationScore || 0) - (a.reputationScore || 0)).slice(0, 5));
+        const loadFeed = () => {
+            const q = JSON.parse(localStorage.getItem('phn_questions') || '[]');
+            const p = JSON.parse(localStorage.getItem('phn_profiles') || '{}');
+            Object.keys(p).forEach(addr => updateLocalCRED(addr));
+            const updatedP = JSON.parse(localStorage.getItem('phn_profiles') || '{}');
+            setQuestions([...q].reverse());
+            setProfiles(updatedP);
+            const users = Object.values(updatedP) as any[];
+            setTopUsers(users.sort((a: any, b: any) => (b.reputationScore || 0) - (a.reputationScore || 0)).slice(0, 5));
+        };
+        loadFeed();
+        const interval = setInterval(loadFeed, 5000);
 
         // Trending tags
-        const allTags = q.flatMap((q: any) => q.tags || []);
-        const tagCount: Record<string, number> = {};
-        allTags.forEach((t: string) => { tagCount[t] = (tagCount[t] || 0) + 1; });
-        setTrendingTags(Object.keys(tagCount).sort((a, b) => tagCount[b] - tagCount[a]).slice(0, 8));
+        const allTags2 = JSON.parse(localStorage.getItem('phn_questions') || '[]').flatMap((q: any) => q.tags || []);
+        const tagCount2: Record<string, number> = {};
+        allTags2.forEach((t: string) => { tagCount2[t] = (tagCount2[t] || 0) + 1; });
+        setTrendingTags(Object.keys(tagCount2).sort((a, b) => tagCount2[b] - tagCount2[a]).slice(0, 8));
+        return () => clearInterval(interval);
     }, []);
 
     const filtered = questions.filter(q => {

@@ -389,8 +389,8 @@ export default function QuestionDetail() {
 
                                         {/* Accept button - only question owner */}
                                         {isOwner && !question.acceptedAnswerId && (
-                                            <button onClick={() => handleAccept(answer.id)} disabled={loading} style={{ padding: '7px 16px', borderRadius: 8, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginLeft: 'auto' }}>
-                                                ✅ Accept Answer
+                                            <button onClick={() => handleAccept(answer.id)} disabled={loading} style={{ padding: '7px 16px', borderRadius: 8, background: loading ? 'rgba(107,114,128,0.2)' : 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981', fontSize: 12, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', marginLeft: 'auto' }}>
+                                                {loading ? '⏳ Confirming...' : '✅ Accept Answer'}
                                             </button>
                                         )}
                                     </div>

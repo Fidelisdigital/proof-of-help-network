@@ -161,7 +161,7 @@ export default function Explorer() {
                 </div>
 
                 <div style={{ marginTop: 16, fontSize: 12, color: '#4B5563', textAlign: 'center' }}>
-                    Auto-refreshing every 8 seconds · Showing last 30 blocks · Canopy v0.1.18+beta
+                    Auto-refreshing every 8 seconds · Showing last 100 blocks · Canopy v0.1.18+beta
                 </div>
 
                 {/* Terminal display */}

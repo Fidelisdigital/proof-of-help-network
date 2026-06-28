@@ -31,6 +31,7 @@ interface WalletContextType {
     blockHeight: number;
     deductFee: (amount?: number) => void;
     isLoading: boolean;
+    setTxInProgress: (v: boolean) => void;
 }
 
 const defaultWallet: WalletState = {
@@ -50,13 +51,15 @@ const WalletContext = createContext<WalletContextType>({
     disconnect: () => {},
     blockHeight: 0,
     deductFee: () => {},
-    isLoading: true
+    isLoading: true,
+    setTxInProgress: () => {}
 });
 
 export function WalletProvider({ children }: { children: ReactNode }) {
     const [wallet, setWalletState] = useState<WalletState>(defaultWallet);
     const [blockHeight, setBlockHeight] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
+    const [txInProgress, setTxInProgress] = useState(false);
 
     // Load wallet from localStorage on startup + sync from chain
     useEffect(() => {
@@ -97,6 +100,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (!wallet.isConnected || !wallet.address) return;
         const fetchChainState = async () => {
+            if (txInProgress) return; // don't overwrite during active tx
             try {
                 // Get real balance from chain tx history
                 const chainBalance = await getBalanceFromChain(wallet.address, 50000);
@@ -164,7 +168,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <WalletContext.Provider value={{ wallet, setWallet, updateBalance, disconnect, blockHeight, deductFee, isLoading }}>
+        <WalletContext.Provider value={{ wallet, setWallet, updateBalance, disconnect, blockHeight, deductFee, isLoading, setTxInProgress }}>
             {children}
         </WalletContext.Provider>
     );
