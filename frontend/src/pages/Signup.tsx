@@ -222,7 +222,7 @@ export default function Signup() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 8, cursor: 'pointer' }} onClick={() => nav('/')}>
                         <img src="/phn-logo.svg" alt="PHN" style={{ width: 40, height: 40 }} />
                         <div>
-                            <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 16, color: '#fff', letterSpacing: 1 }}>PHN NETWORK</div>
+                            <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 16, color: '#fff', letterSpacing: 1 }}>PHN</div>
                             <div style={{ fontSize: 10, color: '#4B5563', letterSpacing: 2 }}>PROOF OF HELP</div>
                         </div>
                     </div>

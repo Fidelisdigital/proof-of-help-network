@@ -339,7 +339,7 @@ export default function Landing() {
                                     { platform: 'Web2 Q&A Sites', problem: 'Own your reputation. Delete account = gone forever.', color: '#EF4444' },
                                     { platform: 'Professional Networks', problem: 'Endorsements are fake. Anyone can endorse anything.', color: '#EF4444' },
                                     { platform: 'Community Platforms', problem: 'Karma is meaningless. No real value attached.', color: '#EF4444' },
-                                    { platform: 'PHN', problem: 'You own your CRED. Onchain forever. Real stakes.', color: '#10B981', good: true },
+                                    { platform: 'PHN', problem: 'You own your CRED. Onchain forever. Nobody can take it.', color: '#10B981', good: true },
                                 ].map(({ platform, problem, color, good }: any) => (
                                     <div key={platform} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 18px', borderRadius: 12, background: good ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.04)', border: `1px solid ${color}20` }}>
                                         <div style={{ fontSize: 16, marginTop: 1 }}>{good ? '✅' : '❌'}</div>
@@ -400,7 +400,7 @@ export default function Landing() {
                         {[
                             { n: '01', icon: '❓', name: 'Alice', role: 'React Developer', color: '#6366F1', title: 'Asks a Question', desc: 'Alice needs help with React hooks. She creates her profile and posts a question on PHN. The CreateQuestion transaction is BLS12-381 signed and permanently recorded on Canopy blockchain.', tx: 'create_question' },
                             { n: '02', icon: '💡', name: 'Bob', role: 'Senior Dev', color: '#8B5CF6', title: 'Submits Answer Onchain', desc: 'Bob sees Alice\'s question and submits a detailed answer. His SubmitAnswer transaction fires — signed with BLS12-381 and permanently recorded on Canopy. His answer is now verifiable onchain.', tx: 'submit_answer' },
-                            { n: '03', icon: '✅', name: 'Charlie', role: 'Hiring Manager', color: '#A78BFA', title: 'Verifies & Discovers', desc: 'Charlie verifies Bob\'s answer as helpful. Alice accepts it. Bob gains +50 CRED onchain. Charlie searches for React devs — Bob appears at the top with 684 verified CRED. Zero followers needed.', tx: 'verify_answer + accept_answer' },
+                            { n: '03', icon: '✅', name: 'Charlie', role: 'Hiring Manager', color: '#A78BFA', title: 'Verifies & Discovers', desc: 'Charlie verifies Bob\'s answer as helpful. Alice accepts it. Bob gains +5 CRED onchain. Charlie searches for React devs — Bob appears at the top with verified CRED. Zero followers needed.', tx: 'verify_answer + accept_answer' },
                         ].map(card => (
                             <div key={card.n} style={{
                                 background: 'rgba(10,10,25,0.8)', border: `1px solid ${card.color}25`,
@@ -573,7 +573,7 @@ export default function Landing() {
                                     { label: 'How it works', id: 'how-it-works' },
                                     { label: 'CRED Token', id: 'features' },
                                     { label: 'Trust Score', id: 'features' },
-                                    { label: 'Reputation Staking', id: 'features' },
+                                    { label: 'Reputation System', id: 'features' },
                                 ].map(item => (
                                     <li key={item.label}>
                                         <button onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}

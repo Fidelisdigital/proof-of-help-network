@@ -81,7 +81,7 @@ export async function calculateCREDFromChain(address: string): Promise<number> {
         await Promise.all(addresses.map(async (addr) => {
             if (addr === address) return; // skip self
             try {
-                const txs = await getTxsBySender(addr, 100);
+                const txs = await getTxsBySender(addr, 500);
                 txs.forEach((tx: any) => {
                     if (tx.messageType === 'reward_reputation') {
                         // recipient field shows who received the reward
@@ -247,7 +247,7 @@ export async function syncFromKnownUsers(): Promise<void> {
 
         await Promise.all(addresses.map(async (addr) => {
             try {
-                const txs = await getTxsBySender(addr, 100);
+                const txs = await getTxsBySender(addr, 500);
                 for (const tx of txs) {
                     await processTx(tx, profiles, questions, answers);
                 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import { txCreateTribe, txJoinTribe } from '../utils/transactions';
+import { getTribeMembersFromChain } from '../utils/state';
 import { waitForTx } from '../utils/rpc';
 
 const TRIBE_CATEGORIES = ['Builders', 'Writers', 'Designers', 'Crypto', 'Business', 'AI', 'Web3', 'General'];
@@ -20,6 +21,16 @@ export default function Tribes() {
     useEffect(() => {
         const t = JSON.parse(localStorage.getItem('phn_tribes') || '[]');
         setTribes(t);
+        // Refresh tribe member counts from chain
+        t.forEach(async (tribe: any) => {
+                try {
+                    const members = await getTribeMembersFromChain(tribe.id);
+                    const realCount = Math.max(members.length, 1);
+                    setTribes(prev => prev.map((tr: any) =>
+                        tr.id === tribe.id ? { ...tr, memberCount: realCount } : tr
+                    ));
+                } catch { /* keep local count */ }
+        });
     }, []);
 
     const handleCreate = async () => {

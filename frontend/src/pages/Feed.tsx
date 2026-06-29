@@ -24,7 +24,7 @@ function Navbar() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flexShrink: 0 }} onClick={() => nav('/feed')}>
                 <img src="/phn-logo.svg" alt="PHN" style={{ width: 30, height: 30 }} />
                 <div>
-                    <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: 12, color: '#fff', letterSpacing: 1 }}>PHN NETWORK</div>
+                    <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: 12, color: '#fff', letterSpacing: 1 }}>PHN</div>
                     <div style={{ fontSize: 8, color: '#4B5563', letterSpacing: 2 }}>PROOF OF HELP</div>
                 </div>
             </div>
