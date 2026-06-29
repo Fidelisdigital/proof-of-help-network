@@ -271,15 +271,22 @@ async function processTx(tx: any, profiles: any, questions: any[], answers: any[
 
     if (type === 'create_profile') {
         // Full profile data readable from chain
+        const username = msg.username || '';
         profiles[sender] = {
             address: sender,
-            username: msg.username || '',
+            username,
             bio: msg.bio || '',
             expertiseTags: msg.expertiseTags || msg.tags || [],
             reputationScore: 0,
             createdAt: txTime,
             joinBlock: tx.height
         };
+        // Save username->address mapping for login
+        if (username) {
+            const usernameMap = JSON.parse(localStorage.getItem('phn_usernames') || '{}');
+            usernameMap[username.toLowerCase()] = sender;
+            localStorage.setItem('phn_usernames', JSON.stringify(usernameMap));
+        }
     }
     else if (type === 'update_profile') {
         if (profiles[sender]) {
@@ -288,16 +295,22 @@ async function processTx(tx: any, profiles: any, questions: any[], answers: any[
         }
     }
     else if (type === 'create_question') {
-        // Title, category, tags all readable from chain
-        if (!questions.find((q: any) => q.contentHash === msg.contentHash)) {
+        // Full content now stored in tx msg — truly onchain
+        // Field mapping: title=field2, content=field3, contentHash=field4, category=field5, tags=field6
+        const title = msg.title || msg[2] || '';
+        const content = msg.content || msg[3] || '';
+        const contentHash = msg.contentHash || msg[4] || '';
+        const category = msg.category || msg[5] || 'General';
+        const tags = msg.tags || msg[6] || [];
+        if (title && !questions.find((q: any) => q.contentHash === contentHash)) {
             questions.push({
                 id: `q_${sender.slice(0,8)}_${tx.height}`,
                 authorAddress: sender,
-                title: msg.title || '',
-                content: msg.content || '', // may be empty — full text stored locally
-                contentHash: msg.contentHash || '',
-                category: msg.category || 'General',
-                tags: msg.tags || [],
+                title,
+                content,
+                contentHash,
+                category,
+                tags,
                 answerCount: 0,
                 acceptedAnswerId: '',
                 createdAt: txTime,
@@ -307,13 +320,17 @@ async function processTx(tx: any, profiles: any, questions: any[], answers: any[
         }
     }
     else if (type === 'submit_answer') {
-        if (!answers.find((a: any) => a.contentHash === msg.contentHash)) {
+        // Full content stored in tx msg
+        const content = msg.content || msg[3] || '';
+        const contentHash = msg.contentHash || msg[4] || '';
+        const questionId = msg.questionId || msg[2] || '';
+        if (!answers.find((a: any) => a.contentHash === contentHash)) {
             answers.push({
                 id: `a_${sender.slice(0,8)}_${tx.height}`,
-                questionId: msg.questionId || '',
+                questionId,
                 authorAddress: sender,
-                content: msg.content || '',
-                contentHash: msg.contentHash || '',
+                content,
+                contentHash,
                 helpfulVotes: 0,
                 accurateVotes: 0,
                 isAccepted: false,
@@ -325,12 +342,36 @@ async function processTx(tx: any, profiles: any, questions: any[], answers: any[
         }
     }
     else if (type === 'accept_answer') {
-        // Mark answer as accepted
         const acceptedAnswerId = msg.answerId || '';
         const q = questions.find((q: any) => q.id === msg.questionId);
         if (q) q.acceptedAnswerId = acceptedAnswerId;
         const a = answers.find((a: any) => a.id === acceptedAnswerId);
         if (a) a.isAccepted = true;
+    }
+    else if (type === 'create_tribe') {
+        // Tribe name/description readable from chain msg
+        const name = msg.name || msg[2] || '';
+        const description = msg.description || msg[3] || '';
+        const category = msg.category || msg[4] || 'General';
+        if (name) {
+            const tribeId = `t_${sender.slice(0,8)}_${tx.height}`;
+            const tribes = JSON.parse(localStorage.getItem('phn_tribes') || '[]');
+            const exists = tribes.find((t: any) => t.creatorAddress === sender && t.name === name);
+            if (!exists) {
+                tribes.push({
+                    id: tribeId,
+                    creatorAddress: sender,
+                    name,
+                    description,
+                    category,
+                    memberCount: 1,
+                    createdAt: txTime,
+                    height: tx.height,
+                    fromChain: true
+                });
+                localStorage.setItem('phn_tribes', JSON.stringify(tribes));
+            }
+        }
     }
 }
 

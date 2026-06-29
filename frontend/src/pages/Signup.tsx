@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
-import { keystoreNewKey, keystoreGetKey, waitForTx, getAccount } from '../utils/rpc';
+import { keystoreNewKey, keystoreGetKey, waitForTx, getAccount, getTxsByHeight, getHeight } from '../utils/rpc';
 import { txCreateProfile, claimFaucet } from '../utils/transactions';
 
 type Step = 'profile' | 'creating' | 'faucet' | 'done';
@@ -30,8 +30,39 @@ export default function Signup() {
         if (!loginUsername.trim()) { setError('Username is required'); return; }
         if (!loginPassword.trim()) { setError('Password is required'); return; }
         try {
+            // First check localStorage cache
+            let addr = '';
             const usernameMap = JSON.parse(localStorage.getItem('phn_usernames') || '{}');
-            const addr = usernameMap[loginUsername.trim().toLowerCase()];
+            addr = usernameMap[loginUsername.trim().toLowerCase()] || '';
+
+            // If not in localStorage, search chain tx history
+            if (!addr) {
+                addLog?.('Searching chain for username...');
+                try {
+                    const height = await getHeight();
+                    // Scan recent blocks for create_profile txs
+                    for (let h = Math.max(1, height - 500); h <= height; h++) {
+                        try {
+                            const txs = await getTxsByHeight(h);
+                            for (const tx of txs) {
+                                if (tx.messageType === 'create_profile') {
+                                    const msg = tx.transaction?.msg || {};
+                                    if (msg.username?.toLowerCase() === loginUsername.trim().toLowerCase()) {
+                                        addr = tx.sender;
+                                        // Cache it
+                                        const map = JSON.parse(localStorage.getItem('phn_usernames') || '{}');
+                                        map[msg.username.toLowerCase()] = addr;
+                                        localStorage.setItem('phn_usernames', JSON.stringify(map));
+                                        break;
+                                    }
+                                }
+                            }
+                            if (addr) break;
+                        } catch { /* skip */ }
+                    }
+                } catch { /* fallback to localStorage only */ }
+            }
+
             if (!addr) { setError('Username not found. Please sign up first.'); return; }
             const keys = await keystoreGetKey(addr, loginPassword);
             if (!keys.privateKey) { setError('Invalid password'); return; }

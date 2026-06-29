@@ -74,22 +74,24 @@ function encodeUpdateProfile(address: string, bio: string, tags: string[]): Uint
     );
 }
 
-function encodeCreateQuestion(authorAddress: string, title: string, contentHash: string, category: string, tags: string[]): Uint8Array {
+function encodeCreateQuestion(authorAddress: string, title: string, content: string, contentHash: string, category: string, tags: string[]): Uint8Array {
     return concat(
         encodeBytes(1, hexToBytes(authorAddress)),
         encodeString(2, title),
-        encodeString(3, contentHash),
-        encodeString(4, category),
-        ...tags.map(tag => encodeString(5, tag))
+        encodeString(3, content),
+        encodeString(4, contentHash),
+        encodeString(5, category),
+        ...tags.map(tag => encodeString(6, tag))
     );
 }
 
-function encodeSubmitAnswer(authorAddress: string, questionId: string, contentHash: string, stakeAmount: number): Uint8Array {
+function encodeSubmitAnswer(authorAddress: string, questionId: string, content: string, contentHash: string, stakeAmount: number): Uint8Array {
     return concat(
         encodeBytes(1, hexToBytes(authorAddress)),
         encodeString(2, questionId),
-        encodeString(3, contentHash),
-        encodeUint64(4, stakeAmount)
+        encodeString(3, content),
+        encodeString(4, contentHash),
+        encodeUint64(5, stakeAmount)
     );
 }
 
@@ -210,8 +212,9 @@ export async function txUpdateProfile(address: string, bio: string, tags: string
 
 export async function txCreateQuestion(authorAddress: string, title: string, content: string, category: string, tags: string[], publicKey: string, privateKey: string, tribeId = ''): Promise<string> {
     const contentHash = await sha256Hash(title + content + authorAddress);
-    const msgBytes = encodeCreateQuestion(authorAddress, title, contentHash, category, tags);
-    // Store content locally with real hash
+    // Store full content in tx msg — truly onchain
+    const msgBytes = encodeCreateQuestion(authorAddress, title, content, contentHash, category, tags);
+    // Also cache locally for instant display
     const questions = JSON.parse(localStorage.getItem('phn_questions') || '[]');
     const questionId = `q_${authorAddress.slice(0, 8)}_${Date.now()}`;
     questions.push({ id: questionId, authorAddress, title, content, contentHash, category, tags, tribeId, answerCount: 0, acceptedAnswerId: '', createdAt: Date.now() });
@@ -221,8 +224,9 @@ export async function txCreateQuestion(authorAddress: string, title: string, con
 
 export async function txSubmitAnswer(authorAddress: string, questionId: string, content: string, stakeAmount: number, publicKey: string, privateKey: string): Promise<string> {
     const contentHash = await sha256Hash(content + authorAddress + questionId);
-    const msgBytes = encodeSubmitAnswer(authorAddress, questionId, contentHash, stakeAmount);
-    // Store answer locally with real hash
+    // Store full content in tx msg — truly onchain
+    const msgBytes = encodeSubmitAnswer(authorAddress, questionId, content, contentHash, stakeAmount);
+    // Also cache locally for instant display
     const answers = JSON.parse(localStorage.getItem('phn_answers') || '[]');
     const answerId = `a_${authorAddress.slice(0, 8)}_${Date.now()}`;
     answers.push({ id: answerId, questionId, authorAddress, content, contentHash, stakeAmount, helpfulVotes: 0, accurateVotes: 0, misleadingVotes: 0, isAccepted: false, isDisputed: false, createdAt: Date.now() });

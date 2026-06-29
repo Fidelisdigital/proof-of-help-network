@@ -358,7 +358,7 @@ export default function Landing() {
                                 { icon: '🧠', title: 'Knowledge Economy', desc: 'Every question and answer is an economic transaction. Knowledge has real monetary weight on PHN.' },
                                 { icon: '🏆', title: 'CRED — Your Reputation Token', desc: 'CRED is earned through verified contributions. It cannot be bought, transferred, or faked. Pure proof of expertise.' },
                                 { icon: '🔗', title: 'Onchain Social Graph', desc: 'Follows, endorsements, tribe memberships — all recorded as real Canopy transactions. Your network is yours forever.' },
-                                { icon: '⚖️', title: 'Stake to Answer', desc: 'Put your CRED on the line when you answer. Confidence earns rewards. Misleading answers lose stake. Real accountability.' },
+                                { icon: '⚖️', title: 'Verify to Earn', desc: 'Vote Helpful or Accurate on answers you trust. Each vote is a signed Canopy transaction. Good answers earn PROOFH tips automatically.' },
                             ].map(({ icon, title, desc }) => (
                                 <div key={title} style={{ display: 'flex', gap: 18, padding: '20px 24px', borderRadius: 16, background: 'rgba(10,10,25,0.8)', border: '1px solid rgba(99,102,241,0.12)', transition: 'border-color 0.3s' }}
                                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(99,102,241,0.4)'; }}
@@ -399,7 +399,7 @@ export default function Landing() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24, marginBottom: 64 }}>
                         {[
                             { n: '01', icon: '❓', name: 'Alice', role: 'React Developer', color: '#6366F1', title: 'Asks a Question', desc: 'Alice needs help with React hooks. She creates her profile and posts a question on PHN. The CreateQuestion transaction is BLS12-381 signed and permanently recorded on Canopy blockchain.', tx: 'create_question' },
-                            { n: '02', icon: '💡', name: 'Bob', role: 'Senior Dev', color: '#8B5CF6', title: 'Answers & Stakes CRED', desc: 'Bob sees Alice\'s question and submits a detailed answer. He stakes 20 CRED on it — real skin in the game. His SubmitAnswer transaction fires and his reputation is on the line.', tx: 'submit_answer' },
+                            { n: '02', icon: '💡', name: 'Bob', role: 'Senior Dev', color: '#8B5CF6', title: 'Submits Answer Onchain', desc: 'Bob sees Alice\'s question and submits a detailed answer. His SubmitAnswer transaction fires — signed with BLS12-381 and permanently recorded on Canopy. His answer is now verifiable onchain.', tx: 'submit_answer' },
                             { n: '03', icon: '✅', name: 'Charlie', role: 'Hiring Manager', color: '#A78BFA', title: 'Verifies & Discovers', desc: 'Charlie verifies Bob\'s answer as helpful. Alice accepts it. Bob gains +50 CRED onchain. Charlie searches for React devs — Bob appears at the top with 684 verified CRED. Zero followers needed.', tx: 'verify_answer + accept_answer' },
                         ].map(card => (
                             <div key={card.n} style={{
@@ -460,7 +460,7 @@ export default function Landing() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24 }}>
                         {[
                             { icon: '🔐', title: 'Own Your Reputation', color: '#6366F1', desc: 'Your CRED score lives onchain forever. No company can delete it, ban you, or take it away. Permanently yours on Canopy blockchain.', points: ['Wallet-bound identity', 'Permanent history', 'Portable forever'] },
-                            { icon: '🎯', title: 'Stake to Answer', color: '#8B5CF6', desc: 'Put skin in the game. Stake CRED on your answers. Earn bonus if verified helpful. Lose stake if misleading. Real accountability.', points: ['Skin in the game', 'Quality over quantity', 'Spam eliminated'] },
+                            { icon: '🎯', title: 'Verify to Earn', color: '#8B5CF6', desc: 'Vote Helpful or Accurate on answers you trust. Each vote fires a real Canopy transaction. Good answers earn PROOFH automatically.', points: ['Every vote is onchain', 'Earn PROOFH for helping', 'CRED builds reputation'] },
                             { icon: '✅', title: 'Community Verified', color: '#A78BFA', desc: 'No algorithms. No moderators. Community verifies answers as helpful, accurate, or misleading. Every vote is a real onchain transaction.', points: ['Decentralized', 'Transparent', '15 tx types'] },
                         ].map(f => (
                             <div key={f.title} style={{
@@ -527,7 +527,7 @@ export default function Landing() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                                 <img src="/phn-logo.svg" alt="PHN Logo" style={{ width: 40, height: 40 }} />
                                 <div>
-                                    <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: 14, color: '#fff' }}>PHN NETWORK</div>
+                                    <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: 14, color: '#fff' }}>PHN</div>
                                     <div style={{ fontSize: 10, color: '#4B5563', letterSpacing: 2 }}>PROOF OF HELP</div>
                                 </div>
                             </div>
