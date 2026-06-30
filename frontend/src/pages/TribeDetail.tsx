@@ -239,10 +239,47 @@ export default function TribeDetail() {
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                             <h2 style={{ fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: 18, color: '#fff', margin: 0 }}>Tribe Questions</h2>
-                            <button onClick={() => nav(`/ask?tribeId=${id}`)} style={{ padding: '8px 16px', borderRadius: 8, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Syne,sans-serif' }}>
-                                + Ask Question
-                            </button>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                {(isJoined || tribe?.creatorAddress === wallet.address) && questions.length > 0 && (
+                                    <button onClick={() => setShowPinModal(!showPinModal)} style={{ padding: '8px 16px', borderRadius: 8, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                                        📌 Vote to Pin
+                                    </button>
+                                )}
+                                <button onClick={() => nav(`/ask?tribeId=${id}`)} style={{ padding: '8px 16px', borderRadius: 8, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Syne,sans-serif' }}>
+                                    + Ask Question
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Pinned Question Display */}
+                        {pinnedQuestion && (
+                            <div onClick={() => nav(`/question/${pinnedQuestion.id}`)} style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 14, padding: '16px 20px', marginBottom: 16, cursor: 'pointer' }}>
+                                <div style={{ fontSize: 12, color: '#F59E0B', fontWeight: 700, marginBottom: 8 }}>📌 PINNED</div>
+                                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: 'Syne,sans-serif' }}>{pinnedQuestion.title}</div>
+                            </div>
+                        )}
+
+                        {/* Pin Vote Modal */}
+                        {showPinModal && (
+                            <div style={{ background: 'rgba(10,10,25,0.95)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 16, padding: 20, marginBottom: 16 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#F59E0B', marginBottom: 12 }}>📌 Vote to Pin a Question</div>
+                                <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 12 }}>2 member votes needed to pin.</div>
+                                {questions.map(q => {
+                                    const votes = pinVotes[q.id] || [];
+                                    const myVote = votes.includes(wallet.address);
+                                    return (
+                                        <div key={q.id} onClick={() => handleVotePin(q.id)} style={{ padding: '10px 14px', borderRadius: 10, background: myVote ? 'rgba(245,158,11,0.1)' : 'rgba(6,6,18,0.8)', border: myVote ? '1px solid rgba(245,158,11,0.4)' : '1px solid #1F2937', marginBottom: 8, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontSize: 13, color: '#fff' }}>{q.title}</span>
+                                            <span style={{ fontSize: 11, color: myVote ? '#F59E0B' : '#4B5563' }}>{votes.length}/2 votes {myVote ? '✓' : ''}</span>
+                                        </div>
+                                    );
+                                })}
+                                <button onClick={() => setShowPinModal(false)} style={{ marginTop: 8, padding: '6px 14px', borderRadius: 8, background: 'transparent', border: '1px solid #1F2937', color: '#6B7280', fontSize: 12, cursor: 'pointer' }}>Close</button>
+                            </div>
+                        )}
+
+                        {error && <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', fontSize: 13, marginBottom: 12 }}>{error}</div>}
+
                         {questions.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: 40, background: 'rgba(10,10,25,0.8)', border: '1px solid #1A1A2E', borderRadius: 16, color: '#6B7280' }}>
                                 <div style={{ fontSize: 32, marginBottom: 12 }}>💬</div>
