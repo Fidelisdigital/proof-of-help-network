@@ -16,8 +16,8 @@ The onchain Q&A network where helping others earns CRED reputation that nobody c
 
 ## The idea
 
-Stack Overflow reputation can be wiped by a moderator. Reddit karma means nothing once you leave the platform. LinkedIn endorsements are free clicks with no cost and no proof. PHN fixes this by making every reputation-affecting action a real, signed Canopy transaction: asking, answering, voting, following, and endorsing. Your CRED score is computed by querying that transaction history — not by reading a number a server stored for you.
-
+Most platforms turn your contributions into someone else's asset. You answer questions, build a following, earn endorsements — and all of it sits inside a company's database, shaped by their incentives, not yours. Leave the platform and it's gone. Get moderated and it's gone. The platform changes its algorithm and your visibility is gone.
+PHN treats reputation as something that should belong to the person who earned it. Every action that builds your standing — asking a good question, giving a helpful answer, being voted accurate, being followed or endorsed — happens as a real transaction on Canopy. CRED isn't a feature inside an app; it's a record on a chain that exists independently of whether PHN itself keeps running.
 ---
 
 ## What's verifiably onchain
