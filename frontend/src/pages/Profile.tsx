@@ -121,6 +121,14 @@ export default function Profile() {
         try {
             const hash = await txFollowUser(wallet.address, address, wallet.publicKey, wallet.privateKey);
             await waitForTx(wallet.address, hash, 60000);
+            // Save to phn_follows for quick lookup
+            const follows = JSON.parse(localStorage.getItem('phn_follows') || '{}');
+            if (!follows[wallet.address]) follows[wallet.address] = [];
+            if (!follows[wallet.address].includes(address)) {
+                follows[wallet.address].push(address);
+                localStorage.setItem('phn_follows', JSON.stringify(follows));
+            }
+            setFollowingCount(prev => prev + 1);
             setSuccess('Following! TX: ' + hash.slice(0, 16) + '...');
         } catch (e: any) { setSuccess('Error: ' + e.message); }
         setLoading(false);
