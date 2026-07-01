@@ -38,6 +38,8 @@ export default function Profile() {
         txTypes: {} as Record<string, number>
     });
     const [chainCRED, setChainCRED] = useState<number | null>(null);
+    const [followerCount, setFollowerCount] = useState(0);
+    const [followingCount, setFollowingCount] = useState(0);
 
     const isOwn = wallet.address === address;
 
@@ -54,6 +56,29 @@ export default function Profile() {
         setQuestions(allQ.filter((q: any) => q.authorAddress === address));
         const allA = JSON.parse(localStorage.getItem('phn_answers') || '[]');
         setAnswers(allA.filter((a: any) => a.authorAddress === address));
+        // Count followers from chain — query all known users' follow_user txs
+        const allProfiles = JSON.parse(localStorage.getItem('phn_profiles') || '{}');
+        const allAddresses = Object.keys(allProfiles);
+        let followers = 0;
+        let following = 0;
+        Promise.all(allAddresses.map(async (addr) => {
+            try {
+                const txs = await getTxsBySender(addr, 100);
+                txs.forEach((tx: any) => {
+                    if (tx.messageType === 'follow_user') {
+                        const msg = tx.transaction?.msg || {};
+                        // This user is following someone
+                        if (addr === address) following++;
+                        // Someone is following this profile
+                        if (tx.recipient === address && addr !== address) followers++;
+                    }
+                });
+            } catch { /* skip */ }
+        })).then(() => {
+            setFollowerCount(followers);
+            setFollowingCount(following);
+        });
+
         // Fetch chain stats for identity
         getTxsBySender(address, 100).then(allTxs => {
             const txCount = allTxs.length;
@@ -269,12 +294,14 @@ export default function Profile() {
                 </div>
 
                 {/* Stats */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 16, marginBottom: 24 }}>
                     {[
                         { label: 'CRED Score', value: chainCRED !== null ? chainCRED : '...', color: credColor },
                         { label: 'Questions', value: questions.length, color: '#6366F1' },
                         { label: 'Answers', value: answers.length, color: '#8B5CF6' },
-                        { label: 'Endorsements', value: profile.endorsements || 0, color: '#10B981' },
+                        { label: 'Followers', value: followerCount, color: '#10B981' },
+                        { label: 'Following', value: followingCount, color: '#06B6D4' },
+                        { label: 'Endorsements', value: profile.endorsements || 0, color: '#F59E0B' },
                     ].map(({ label, value, color }) => (
                         <div key={label} style={{ background: 'rgba(10,10,25,0.8)', border: '1px solid #1A1A2E', borderRadius: 16, padding: '20px 24px', textAlign: 'center' }}>
                             <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: 32, color, marginBottom: 4 }}>{value}</div>

@@ -133,11 +133,7 @@ export default function QuestionDetail() {
                 try {
                     await txRewardReputation(wallet.address, answer.authorAddress, 5, vote, wallet.publicKey, wallet.privateKey);
                 } catch { /* non-blocking */ }
-                // Send PROOFH tip to answerer — makes PROOFH a real social token
-                try {
-                    await txSendPROOFH(wallet.address, answer.authorAddress, 100, wallet.publicKey, wallet.privateKey);
-                } catch { /* non-blocking — voter may not have enough */ }
-                setSuccess(`Verified as ${vote}! +5 CRED + 100 PROOFH sent to ${profiles[answer.authorAddress]?.username || 'answerer'}. TX: ${hash.slice(0, 16)}...`);
+                setSuccess(`Verified as ${vote}! +5 CRED awarded to ${profiles[answer.authorAddress]?.username || 'answerer'}. TX: ${hash.slice(0, 16)}...`);
             } else {
                 setSuccess(`Marked as ${vote}. TX: ${hash.slice(0, 16)}...`);
             }

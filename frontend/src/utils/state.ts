@@ -136,15 +136,7 @@ export async function getTribeMembersFromChain(tribeId: string): Promise<string[
                 const joined = txs.some((tx: any) => {
                     if (tx.messageType === 'join_tribe') {
                         const msg = tx.transaction?.msg || {};
-                        // tribeId matches exactly
                         return msg.tribeId === tribeId;
-                    }
-                    if (tx.messageType === 'create_tribe') {
-                        // Creator is always a member
-                        // Check if this user created the tribe by checking localStorage
-                        const tribes = JSON.parse(localStorage.getItem('phn_tribes') || '[]');
-                        const tribe = tribes.find((t: any) => t.id === tribeId);
-                        return tribe?.creatorAddress === addr;
                     }
                     return false;
                 });
